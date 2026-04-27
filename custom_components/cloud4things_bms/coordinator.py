@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+import re
 from datetime import timedelta
 from typing import Any
 
@@ -22,26 +24,49 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+# strip units suffix like "808.5 kWh", "3.0 kW", "Rs. 5578.66"
+_NUMERIC_RE = re.compile(r"^(?:Rs\.\s*)?([+-]?\d+(?:\.\d+)?)")
 
-def flatten_dict(data: Any, prefix: str = "", sep: str = "_") -> dict[str, Any]:
-    """Recursively flatten nested dict/list into dot-key → scalar pairs."""
+
+def _coerce_numeric(value: str) -> float | None:
+    m = _NUMERIC_RE.match(value.strip())
+    if m:
+        return float(m.group(1))
+    return None
+
+
+def _extract_slots(slots: list) -> dict[str, Any]:
+    """Convert C4T slots array [{name, value}] → {name: numeric_value}."""
     result: dict[str, Any] = {}
-    if isinstance(data, dict):
-        for k, v in data.items():
-            new_key = f"{prefix}{sep}{k}" if prefix else k
-            if isinstance(v, (dict, list)):
-                result.update(flatten_dict(v, new_key, sep))
-            elif isinstance(v, (int, float)):
-                result[new_key] = v
-            elif isinstance(v, str):
-                # keep strings that look numeric
-                try:
-                    result[new_key] = float(v)
-                except ValueError:
-                    result[new_key] = v
-    elif isinstance(data, list):
-        for i, item in enumerate(data):
-            result.update(flatten_dict(item, f"{prefix}{sep}{i}" if prefix else str(i), sep))
+    for slot in slots:
+        name = slot.get("name", "")
+        raw = slot.get("value", "")
+        if not name or raw is None:
+            continue
+        raw = str(raw).strip()
+        # try direct numeric
+        try:
+            result[name] = float(raw)
+            continue
+        except ValueError:
+            pass
+        # try stripping unit suffix / currency prefix
+        numeric = _coerce_numeric(raw)
+        if numeric is not None:
+            result[name] = numeric
+        # try parsing nested JSON string (e.g. extra_data)
+        elif raw.startswith("{"):
+            try:
+                nested = json.loads(raw)
+                for k, v in nested.items():
+                    if isinstance(v, (int, float)):
+                        result[f"{name}_{k}"] = float(v)
+                    elif isinstance(v, str):
+                        n = _coerce_numeric(v)
+                        if n is not None:
+                            result[f"{name}_{k}"] = n
+            except (json.JSONDecodeError, TypeError):
+                pass
     return result
 
 
@@ -94,6 +119,28 @@ class C4TBMSCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(f"Connection error: {err}") from err
 
         _LOGGER.debug("C4T BMS raw response: %s", raw)
-        flat = flatten_dict(raw)
-        # only keep numeric values for sensors
-        return {k: v for k, v in flat.items() if isinstance(v, (int, float))}
+        slots = raw.get("slots") if isinstance(raw, dict) else None
+        if isinstance(slots, list):
+            return _extract_slots(slots)
+        # fallback: generic flatten for non-slots response shapes
+        return {k: v for k, v in _generic_flatten(raw).items() if isinstance(v, (int, float))}
+
+
+def _generic_flatten(data: Any, prefix: str = "") -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    if isinstance(data, dict):
+        for k, v in data.items():
+            key = f"{prefix}_{k}" if prefix else k
+            if isinstance(v, (dict, list)):
+                result.update(_generic_flatten(v, key))
+            elif isinstance(v, (int, float)):
+                result[key] = v
+            elif isinstance(v, str):
+                try:
+                    result[key] = float(v)
+                except ValueError:
+                    pass
+    elif isinstance(data, list):
+        for i, item in enumerate(data):
+            result.update(_generic_flatten(item, f"{prefix}_{i}" if prefix else str(i)))
+    return result
