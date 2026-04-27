@@ -1,0 +1,13 @@
+{
+  "domain": "cloud4things_bms",
+  "name": "Cloud4Things BMS Energy Monitor",
+  "version": "1.0.0",
+  "documentation": "https://github.com/saikhurana98/ha-cloud4things-bms",
+  "issue_tracker": "https://github.com/saikhurana98/ha-cloud4things-bms/issues",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": ["@saikhurana98"],
+  "homeassistant": "2024.1.0",
+  "config_flow": true,
+  "iot_class": "cloud_polling"
+}

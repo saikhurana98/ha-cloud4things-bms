@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Cloud4Things BMS Energy Monitor",
+        "description": "Connect to any Cloud4Things BMS API endpoint.",
+        "data": {
+          "access_token": "Access Token",
+          "api_url": "API URL",
+          "intent": "Intent",
+          "intent_id": "Intent ID",
+          "skill": "Skill",
+          "scan_interval": "Poll Interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect. Check API URL.",
+      "invalid_auth": "Invalid access token.",
+      "unknown": "Unexpected error. Check logs."
+    },
+    "abort": {
+      "already_configured": "Already configured."
+    }
+  }
+}
