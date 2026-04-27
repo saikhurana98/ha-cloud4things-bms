@@ -1,7 +1,7 @@
 {
   "domain": "cloud4things_bms",
   "name": "Cloud4Things BMS Energy Monitor",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "documentation": "https://github.com/saikhurana98/ha-cloud4things-bms",
   "issue_tracker": "https://github.com/saikhurana98/ha-cloud4things-bms/issues",
   "requirements": [],
